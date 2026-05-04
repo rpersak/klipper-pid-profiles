@@ -30,10 +30,13 @@ Every time `M109` or `M190` is called (by your slicer or macros), the correct PI
 
 1. Copy `pid_profiles_general.cfg` to your Klipper config directory.
 
-2. Add the include to `printer.cfg`:
+2. Add the following to `printer.cfg`:
    ```ini
    [include pid_profiles_general.cfg]
+   [pid_calibrate]
    ```
+   > `[pid_calibrate]` enables Klipper's `SET_HEATER_PID` and `PID_CALIBRATE` commands.
+   > Without it you will get `Unknown command: "SET_HEATER_PID"`.
 
 3. Fill in your calibrated PID values (see [Calibration](#calibration) below).
 
@@ -43,10 +46,13 @@ Every time `M109` or `M190` is called (by your slicer or macros), the correct PI
 
 1. Copy `pid_profiles_general.cfg` to your Klipper config directory.
 
-2. Add the include to `printer.cfg`:
+2. Add the following to `printer.cfg`:
    ```ini
    [include pid_profiles_general.cfg]
+   [pid_calibrate]
    ```
+   > `[pid_calibrate]` enables Klipper's `SET_HEATER_PID` and `PID_CALIBRATE` commands.
+   > Without it you will get `Unknown command: "SET_HEATER_PID"`.
 
 3. Delete (or comment out) the `M109` and `M190` sections at the bottom of `pid_profiles_general.cfg` to avoid duplicate macro errors.
 
@@ -137,7 +143,11 @@ gcode:
 ```ini
 [include Macro.cfg]
 [include pid_profiles_sv08.cfg]   ← add this line
+[pid_calibrate]                   ← add this line
 ```
+
+> `[pid_calibrate]` enables Klipper's `SET_HEATER_PID` and `PID_CALIBRATE` commands.
+> Without it you will get `Unknown command: "SET_HEATER_PID"`.
 
 #### Fill in your PID values and restart
 
