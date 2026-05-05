@@ -31,49 +31,65 @@ Every time `M109` or `M190` is called (by your slicer or macros), the correct PI
 
 1. Copy `pid_profiles_general.cfg` to your Klipper config directory.
 
-2. Add the following to `printer.cfg`:
+2. Copy `pid_calibrate.py` from this repo to:
+   ```
+   ~/klipper/klippy/extras/pid_calibrate.py
+   ```
+   > Vanilla Klipper's `pid_calibrate.py` does not include `SET_HEATER_PID`.
+   > This file adds it. `[pid_calibrate]` in `printer.cfg` (next step) loads the module.
+
+3. Add the following to `printer.cfg`:
    ```ini
    [include pid_profiles_general.cfg]
    [pid_calibrate]
    ```
-   > `[pid_calibrate]` enables Klipper's `SET_HEATER_PID` and `PID_CALIBRATE` commands.
-   > Without it you will get `Unknown command: "SET_HEATER_PID"`.
 
-3. Fill in your calibrated PID values (see [Calibration](#calibration) below).
+4. Fill in your calibrated PID values (see [Calibration](#calibration) below).
 
-4. Restart Klipper (`FIRMWARE_RESTART`).
+5. Restart Klipper:
+   ```bash
+   sudo systemctl restart klipper
+   ```
 
 #### Option B — you already override `M109`/`M190` in your own macros
 
 1. Copy `pid_profiles_general.cfg` to your Klipper config directory.
 
-2. Add the following to `printer.cfg`:
+2. Copy `pid_calibrate.py` from this repo to:
+   ```
+   ~/klipper/klippy/extras/pid_calibrate.py
+   ```
+   > Vanilla Klipper's `pid_calibrate.py` does not include `SET_HEATER_PID`.
+   > This file adds it. `[pid_calibrate]` in `printer.cfg` (next step) loads the module.
+
+3. Add the following to `printer.cfg`:
    ```ini
    [include pid_profiles_general.cfg]
    [pid_calibrate]
    ```
-   > `[pid_calibrate]` enables Klipper's `SET_HEATER_PID` and `PID_CALIBRATE` commands.
-   > Without it you will get `Unknown command: "SET_HEATER_PID"`.
 
-3. Delete (or comment out) the `M109` and `M190` sections at the bottom of `pid_profiles_general.cfg` to avoid duplicate macro errors.
+4. Delete (or comment out) the `M109` and `M190` sections at the bottom of `pid_profiles_general.cfg` to avoid duplicate macro errors.
 
-4. In your **existing** `M109` macro, add these two lines just before the `M104` call:
+5. In your **existing** `M109` macro, add these two lines just before the `M104` call:
    ```jinja
    {% if s != 0 %}
        _APPLY_PID HEATER=extruder TARGET={s}
    {% endif %}
    ```
 
-5. In your **existing** `M190` macro, add these two lines just before the `M140` call:
+6. In your **existing** `M190` macro, add these two lines just before the `M140` call:
    ```jinja
    {% if s != 0 %}
        _APPLY_PID HEATER=heater_bed TARGET={s}
    {% endif %}
    ```
 
-6. Fill in your calibrated PID values (see [Calibration](#calibration) below).
+7. Fill in your calibrated PID values (see [Calibration](#calibration) below).
 
-7. Restart Klipper (`FIRMWARE_RESTART`).
+8. Restart Klipper:
+   ```bash
+   sudo systemctl restart klipper
+   ```
 
 ---
 
@@ -86,10 +102,10 @@ This version assumes you are using the SV08 `Macro.cfg` that already contains th
 Sovol's Klipper fork ships a modified `pid_calibrate.py` that is **missing the `SET_HEATER_PID` command**. Without it, `_APPLY_PID` will fail every time the heater is set:
 
 ```
-!! Unknown command: "SET_HEATER_PID"
+Internal error on command:"SET_HEATER_PID"
 ```
 
-Fix this **once** before the first `FIRMWARE_RESTART`:
+Fix this **once** before the first print:
 
 1. Copy `pid_calibrate.py` from this repo to the printer at:
    ```
@@ -99,9 +115,14 @@ Fix this **once** before the first `FIRMWARE_RESTART`:
 
 2. This file extends Sovol's original `pid_calibrate.py` with two additions:
    - `SET_HEATER_PID` command (missing from Sovol's fork)
-   - After `PID_CALIBRATE`, values are written **directly into `pid_profiles.cfg`** so `FIRMWARE_RESTART` is all you need — no manual copy, no `SAVE_CONFIG`
+   - After `PID_CALIBRATE`, values are written **directly into `pid_profiles.cfg`** so a restart is all you need — no manual copy, no `SAVE_CONFIG`
 
-> **After a Klipper update via Sovol's updater** this file may be overwritten. If `SET_HEATER_PID` stops working after an update, re-copy the file and do `FIRMWARE_RESTART`.
+3. Restart Klipper via SSH — `FIRMWARE_RESTART` alone is not enough as it does not reload Python modules:
+   ```bash
+   sudo systemctl restart klipper
+   ```
+
+> **After a Klipper update via Sovol's updater** this file may be overwritten. If `SET_HEATER_PID` stops working after an update, re-copy the file and run `sudo systemctl restart klipper`.
 
 ---
 
