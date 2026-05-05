@@ -40,17 +40,39 @@ class PIDCalibrate:
         # Log and report results
         Kp, Ki, Kd = calibrate.calc_final_pid()
         logging.info("Autotune: final: Kp=%f Ki=%f Kd=%f", Kp, Ki, Kd)
-        gcmd.respond_info(
-            "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f\n"
-            "The SAVE_CONFIG command will update the printer config file\n"
-            "with these parameters and restart the printer." % (Kp, Ki, Kd))
-        # Store results for SAVE_CONFIG
-        cfgname = heater.get_name()
+        # Store results for SAVE_CONFIG.
+        # If _pid_profiles macro exists, write to its variables so SAVE_CONFIG
+        # updates the correct profile instead of the heater section in printer.cfg.
         configfile = self.printer.lookup_object('configfile')
-        configfile.set(cfgname, 'control', 'pid')
-        configfile.set(cfgname, 'pid_Kp', "%.3f" % (Kp,))
-        configfile.set(cfgname, 'pid_Ki', "%.3f" % (Ki,))
-        configfile.set(cfgname, 'pid_Kd', "%.3f" % (Kd,))
+        profile_section = 'gcode_macro _pid_profiles'
+        prefix = None
+        pid_profiles_obj = self.printer.lookup_object(profile_section, None)
+        if pid_profiles_obj is not None:
+            variables = pid_profiles_obj.variables
+            if heater_name == 'extruder':
+                threshold = float(variables.get('extruder_threshold', 250.))
+                prefix = 'extruder_high' if target >= threshold else 'extruder_standard'
+            elif heater_name == 'heater_bed':
+                threshold = float(variables.get('bed_threshold', 85.))
+                prefix = 'bed_high' if target > threshold else 'bed_standard'
+        if prefix is not None:
+            gcmd.respond_info(
+                "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f\n"
+                "The SAVE_CONFIG command will update the '%s' PID profile\n"
+                "with these parameters and restart the printer." % (Kp, Ki, Kd, prefix))
+            configfile.set(profile_section, 'variable_%s_kp' % prefix, "%.3f" % (Kp,))
+            configfile.set(profile_section, 'variable_%s_ki' % prefix, "%.3f" % (Ki,))
+            configfile.set(profile_section, 'variable_%s_kd' % prefix, "%.3f" % (Kd,))
+        else:
+            gcmd.respond_info(
+                "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f\n"
+                "The SAVE_CONFIG command will update the printer config file\n"
+                "with these parameters and restart the printer." % (Kp, Ki, Kd))
+            cfgname = heater.get_name()
+            configfile.set(cfgname, 'control', 'pid')
+            configfile.set(cfgname, 'pid_Kp', "%.3f" % (Kp,))
+            configfile.set(cfgname, 'pid_Ki', "%.3f" % (Ki,))
+            configfile.set(cfgname, 'pid_Kd', "%.3f" % (Kd,))
     cmd_SET_HEATER_PID_help = "Sets a heater PID parameter"
     def cmd_SET_HEATER_PID(self, gcmd):
         heater_name = gcmd.get('HEATER')

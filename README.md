@@ -192,17 +192,44 @@ PID_CALIBRATE HEATER=heater_bed  TARGET=100   # bed high
 After each run, Klipper prints something like:
 ```
 // PID parameters: pid_Kp=33.838 pid_Ki=5.223 pid_Kd=47.752
+// The SAVE_CONFIG command will update the 'extruder_standard' PID profile
+// with these parameters and restart the printer.
 ```
 
-Copy the three values into the matching variables in your `.cfg` file:
+---
+
+### Sovol SV08 (with patched `pid_calibrate.py`)
+
+After each `PID_CALIBRATE`, simply run:
+
+```
+SAVE_CONFIG
+```
+
+Klipper will restart and the correct profile variable (`extruder_standard`, `extruder_high`, `bed_standard`, or `bed_high`) will be updated automatically. The target temperature determines which profile is written:
+
+| Heater | Target | Profile updated |
+|---|---|---|
+| `extruder` | < 250 °C | `extruder_standard` |
+| `extruder` | ≥ 250 °C | `extruder_high` |
+| `heater_bed` | ≤ 85 °C | `bed_standard` |
+| `heater_bed` | > 85 °C | `bed_high` |
+
+The values are written to the `#*# SAVE_CONFIG` block at the bottom of `printer.cfg`. They override the defaults in `pid_profiles.cfg` and persist across restarts.
+
+---
+
+### Generic Klipper (without patched `pid_calibrate.py`)
+
+> **Do NOT use `SAVE_CONFIG`** after calibration — that would write values to the heater section in `printer.cfg` and bypass the profile system entirely.
+
+Copy the three values from the console output manually into the matching variables in your `.cfg` file:
 
 ```ini
 variable_extruder_standard_kp: 33.838
 variable_extruder_standard_ki: 5.223
 variable_extruder_standard_kd: 47.752
 ```
-
-> **Do NOT use `SAVE_CONFIG`** after calibration — that would overwrite your `printer.cfg` values and bypass this system. Just copy the numbers manually into the profile file.
 
 ---
 
