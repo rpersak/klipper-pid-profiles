@@ -97,7 +97,9 @@ Fix this **once** before the first `FIRMWARE_RESTART`:
    ```
    Use SCP, Mainsail's file editor, or an SFTP client (e.g. WinSCP, FileZilla).
 
-2. This file is Sovol's original `pid_calibrate.py` with only `SET_HEATER_PID` added — no other behaviour is changed.
+2. This file extends Sovol's original `pid_calibrate.py` with two additions:
+   - `SET_HEATER_PID` command (missing from Sovol's fork)
+   - After `PID_CALIBRATE`, values are written **directly into `pid_profiles.cfg`** so `FIRMWARE_RESTART` is all you need — no manual copy, no `SAVE_CONFIG`
 
 > **After a Klipper update via Sovol's updater** this file may be overwritten. If `SET_HEATER_PID` stops working after an update, re-copy the file and do `FIRMWARE_RESTART`.
 
@@ -189,10 +191,19 @@ PID_CALIBRATE HEATER=heater_bed  TARGET=65    # bed standard
 PID_CALIBRATE HEATER=heater_bed  TARGET=100   # bed high
 ```
 
-After each run, Klipper prints something like:
+After each run, Klipper prints the results and confirms what happens next.
+
+**Sovol SV08 (patched `pid_calibrate.py`):**
 ```
 // PID parameters: pid_Kp=33.838 pid_Ki=5.223 pid_Kd=47.752
-// The SAVE_CONFIG command will update the 'extruder_standard' PID profile
+// Profile 'extruder_standard' written to pid_profiles.cfg.
+// Run FIRMWARE_RESTART to apply.
+```
+
+**Generic Klipper:**
+```
+// PID parameters: pid_Kp=33.838 pid_Ki=5.223 pid_Kd=47.752
+// The SAVE_CONFIG command will update the printer config file
 // with these parameters and restart the printer.
 ```
 
@@ -236,6 +247,21 @@ variable_extruder_standard_kp: 33.838
 variable_extruder_standard_ki: 5.223
 variable_extruder_standard_kd: 47.752
 ```
+
+---
+
+## Commands
+
+| Command | When to use |
+|---|---|
+| `PID_CALIBRATE HEATER=<name> TARGET=<temp>` | Run once per profile to calibrate |
+| `FIRMWARE_RESTART` | After each `PID_CALIBRATE` (SV08) to apply new values |
+| `SAVE_CONFIG` | After each `PID_CALIBRATE` (generic Klipper only) |
+| `M109 S<temp>` | Set hotend temperature — automatically applies the right PID profile |
+| `M190 S<temp>` | Set bed temperature — automatically applies the right PID profile |
+| `SET_HEATER_PID HEATER=<name> KP=<kp> KI=<ki> KD=<kd>` | Manually set PID values at runtime without restart |
+
+`M109` and `M190` cover the normal printing workflow. `PID_CALIBRATE` is a one-time setup step per profile. `SET_HEATER_PID` is for manual or diagnostic use.
 
 ---
 
