@@ -3,7 +3,7 @@
 # Copyright (C) 2016-2018  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import math, logging
+import math, logging, os, re
 from . import heaters
 
 class PIDCalibrate:
@@ -40,10 +40,7 @@ class PIDCalibrate:
         # Log and report results
         Kp, Ki, Kd = calibrate.calc_final_pid()
         logging.info("Autotune: final: Kp=%f Ki=%f Kd=%f", Kp, Ki, Kd)
-        # Store results for SAVE_CONFIG.
-        # If _pid_profiles macro exists, write to its variables so SAVE_CONFIG
-        # updates the correct profile instead of the heater section in printer.cfg.
-        configfile = self.printer.lookup_object('configfile')
+        # If _pid_profiles macro exists, determine which profile to update.
         profile_section = 'gcode_macro _pid_profiles'
         prefix = None
         pid_profiles_obj = self.printer.lookup_object(profile_section, None)
@@ -56,19 +53,50 @@ class PIDCalibrate:
                 threshold = float(variables.get('bed_threshold', 85.))
                 prefix = 'bed_high' if target > threshold else 'bed_standard'
         if prefix is not None:
-            gcmd.respond_info(
-                "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f\n"
-                "The SAVE_CONFIG command will update the '%s' PID profile\n"
-                "with these parameters and restart the printer." % (Kp, Ki, Kd, prefix))
-            configfile.set(profile_section, 'variable_%s_kp' % prefix, "%.3f" % (Kp,))
-            configfile.set(profile_section, 'variable_%s_ki' % prefix, "%.3f" % (Ki,))
-            configfile.set(profile_section, 'variable_%s_kd' % prefix, "%.3f" % (Kd,))
+            # Write directly to pid_profiles.cfg so values land in one place.
+            written = False
+            try:
+                config_file = self.printer.get_start_args()['config_file']
+                profiles_path = os.path.join(
+                    os.path.dirname(config_file), 'pid_profiles.cfg')
+                if os.path.isfile(profiles_path):
+                    with open(profiles_path, 'r') as f:
+                        content = f.read()
+                    for suffix, val in [('kp', Kp), ('ki', Ki), ('kd', Kd)]:
+                        pattern = r'(variable_%s_%s\s*:\s*)[\d.]+' % (prefix, suffix)
+                        content, n = re.subn(pattern,
+                                             r'\g<1>%.3f' % val, content)
+                        if n == 0:
+                            raise ValueError(
+                                "variable_%s_%s not found in pid_profiles.cfg"
+                                % (prefix, suffix))
+                    with open(profiles_path, 'w') as f:
+                        f.write(content)
+                    written = True
+            except Exception as e:
+                logging.warning("pid_calibrate: could not write pid_profiles.cfg: %s", e)
+            if written:
+                gcmd.respond_info(
+                    "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f\n"
+                    "Profile '%s' written to pid_profiles.cfg.\n"
+                    "Run FIRMWARE_RESTART to apply." % (Kp, Ki, Kd, prefix))
+            else:
+                # Fall back: stage for SAVE_CONFIG
+                configfile = self.printer.lookup_object('configfile')
+                gcmd.respond_info(
+                    "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f\n"
+                    "The SAVE_CONFIG command will update the '%s' PID profile\n"
+                    "with these parameters and restart the printer." % (Kp, Ki, Kd, prefix))
+                configfile.set(profile_section, 'variable_%s_kp' % prefix, "%.3f" % (Kp,))
+                configfile.set(profile_section, 'variable_%s_ki' % prefix, "%.3f" % (Ki,))
+                configfile.set(profile_section, 'variable_%s_kd' % prefix, "%.3f" % (Kd,))
         else:
             gcmd.respond_info(
                 "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f\n"
                 "The SAVE_CONFIG command will update the printer config file\n"
                 "with these parameters and restart the printer." % (Kp, Ki, Kd))
             cfgname = heater.get_name()
+            configfile = self.printer.lookup_object('configfile')
             configfile.set(cfgname, 'control', 'pid')
             configfile.set(cfgname, 'pid_Kp', "%.3f" % (Kp,))
             configfile.set(cfgname, 'pid_Ki', "%.3f" % (Ki,))

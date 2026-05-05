@@ -200,13 +200,13 @@ After each run, Klipper prints something like:
 
 ### Sovol SV08 (with patched `pid_calibrate.py`)
 
-After each `PID_CALIBRATE`, simply run:
+After each `PID_CALIBRATE`, run:
 
 ```
-SAVE_CONFIG
+FIRMWARE_RESTART
 ```
 
-Klipper will restart and the correct profile variable (`extruder_standard`, `extruder_high`, `bed_standard`, or `bed_high`) will be updated automatically. The target temperature determines which profile is written:
+The patched `pid_calibrate.py` writes the values **directly into `pid_profiles.cfg`** as soon as calibration finishes — no `SAVE_CONFIG` needed. The target temperature determines which profile is updated:
 
 | Heater | Target | Profile updated |
 |---|---|---|
@@ -215,7 +215,13 @@ Klipper will restart and the correct profile variable (`extruder_standard`, `ext
 | `heater_bed` | ≤ 85 °C | `bed_standard` |
 | `heater_bed` | > 85 °C | `bed_high` |
 
-The values are written to the `#*# SAVE_CONFIG` block at the bottom of `printer.cfg`. They override the defaults in `pid_profiles.cfg` and persist across restarts.
+The console will confirm which profile was written:
+```
+// Profile 'extruder_standard' written to pid_profiles.cfg.
+// Run FIRMWARE_RESTART to apply.
+```
+
+> If `pid_profiles.cfg` cannot be found (e.g. it lives in a subdirectory), the patched module falls back to `SAVE_CONFIG` staging and tells you to run `SAVE_CONFIG` instead.
 
 ---
 
