@@ -109,17 +109,29 @@ class PIDCalibrate:
             heater = pheaters.lookup_heater(heater_name)
         except self.printer.config_error as e:
             raise gcmd.error(str(e))
-        control = heater.get_control()
-        if not isinstance(control, heaters.ControlPID):
+        # Sovol's fork stores control as heater.control; standard Klipper uses get_control()
+        if hasattr(heater, 'get_control'):
+            control = heater.get_control()
+        elif hasattr(heater, 'control'):
+            control = heater.control
+        else:
+            raise gcmd.error("Cannot access heater control object")
+        pid_base = getattr(heaters, 'PID_PARAM_BASE', 255.)
+        pid_cls = getattr(heaters, 'ControlPID', None)
+        if pid_cls is not None and not isinstance(control, pid_cls):
             raise gcmd.error("Not a PID controlled heater")
-        Kp = gcmd.get_float('KP', control.Kp / heaters.PID_PARAM_BASE)
-        Ki = gcmd.get_float('KI', control.Ki / heaters.PID_PARAM_BASE)
-        Kd = gcmd.get_float('KD', control.Kd / heaters.PID_PARAM_BASE)
+        # Internal storage: control.Kp = config_Kp / pid_base — so default shown is config scale
+        cur_Kp = getattr(control, 'Kp', 0.)
+        cur_Ki = getattr(control, 'Ki', 0.)
+        cur_Kd = getattr(control, 'Kd', 0.)
+        Kp = gcmd.get_float('KP', cur_Kp * pid_base)
+        Ki = gcmd.get_float('KI', cur_Ki * pid_base)
+        Kd = gcmd.get_float('KD', cur_Kd * pid_base)
         logging.info("Setting heater %s parameters: Kp=%f Ki=%f Kd=%f",
                      heater_name, Kp, Ki, Kd)
-        control.Kp = Kp * heaters.PID_PARAM_BASE
-        control.Ki = Ki * heaters.PID_PARAM_BASE
-        control.Kd = Kd * heaters.PID_PARAM_BASE
+        control.Kp = Kp / pid_base
+        control.Ki = Ki / pid_base
+        control.Kd = Kd / pid_base
 
 TUNE_PID_DELTA = 5.0
 
