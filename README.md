@@ -19,6 +19,7 @@ Every time `M109` or `M190` is called (by your slicer or macros), the correct PI
 |---|---|
 | `pid_profiles_general.cfg` | Any Klipper printer |
 | `pid_profiles_sv08.cfg` | Sovol SV08 with the matching `Macro.cfg` |
+| `pid_calibrate.py` | Sovol SV08 only — patched Klipper module that adds the missing `SET_HEATER_PID` command |
 
 ---
 
@@ -80,7 +81,29 @@ Every time `M109` or `M190` is called (by your slicer or macros), the correct PI
 
 This version assumes you are using the SV08 `Macro.cfg` that already contains the `_APPLY_PID` hooks in `M109` and `M190`. If you are not, follow Option B above using `pid_profiles_general.cfg` instead.
 
-#### Required changes to `Macro.cfg`
+#### Step 1 — Patch `pid_calibrate.py`
+
+Sovol's Klipper fork ships a modified `pid_calibrate.py` that is **missing the `SET_HEATER_PID` command**. Without it, `_APPLY_PID` will fail every time the heater is set:
+
+```
+!! Unknown command: "SET_HEATER_PID"
+```
+
+Fix this **once** before the first `FIRMWARE_RESTART`:
+
+1. Copy `pid_calibrate.py` from this repo to the printer at:
+   ```
+   /home/sovol/klipper/klippy/extras/pid_calibrate.py
+   ```
+   Use SCP, Mainsail's file editor, or an SFTP client (e.g. WinSCP, FileZilla).
+
+2. This file is Sovol's original `pid_calibrate.py` with only `SET_HEATER_PID` added — no other behaviour is changed.
+
+> **After a Klipper update via Sovol's updater** this file may be overwritten. If `SET_HEATER_PID` stops working after an update, re-copy the file and do `FIRMWARE_RESTART`.
+
+---
+
+#### Step 2 — Required changes to `Macro.cfg`
 
 Open `Macro.cfg` and update the `M109` and `M190` macros as follows.
 
@@ -138,7 +161,7 @@ gcode:
     {% endif %}
 ```
 
-#### Add the include to `printer.cfg`
+#### Step 3 — Add the include to `printer.cfg`
 
 ```ini
 [include Macro.cfg]
@@ -149,7 +172,7 @@ gcode:
 > `[pid_calibrate]` enables Klipper's `SET_HEATER_PID` and `PID_CALIBRATE` commands.
 > Without it you will get `Unknown command: "SET_HEATER_PID"`.
 
-#### Fill in your PID values and restart
+#### Step 4 — Fill in your PID values and restart
 
 See [Calibration](#calibration) below, then `FIRMWARE_RESTART`.
 
